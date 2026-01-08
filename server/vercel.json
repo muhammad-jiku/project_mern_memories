@@ -8,7 +8,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/client/dist/$1"
+      "dest": "/client/build/$1"
     }
   ],
   "env": {
