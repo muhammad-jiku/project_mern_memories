@@ -1,13 +1,23 @@
-import React, { useState } from 'react';
-import { Container, Grow, Grid, AppBar, TextField, Button, Paper } from '@material-ui/core';
+import SearchIcon from '@mui/icons-material/Search';
+import {
+  AppBar,
+  Autocomplete,
+  Chip,
+  Container,
+  Grid,
+  Grow,
+  IconButton,
+  InputAdornment,
+  Paper,
+  TextField,
+} from '@mui/material';
+import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { useHistory, useLocation } from 'react-router-dom';
-import ChipInput from 'material-ui-chip-input';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-import { getPostsBySearch } from '../../actions/posts';
-import Posts from '../Posts/Posts';
-import Form from '../Form/Form';
+import { getPosts, getPostsBySearch } from '../../actions/posts';
 import Pagination from '../Pagination';
+import Posts from '../Posts/Posts';
 import useStyles from './styles';
 
 function useQuery() {
@@ -22,56 +32,125 @@ const Home = () => {
   const [currentId, setCurrentId] = useState(0);
   const dispatch = useDispatch();
 
-  const [search, setSearch] = useState('');
-  const [tags, setTags] = useState([]);
-  const history = useHistory();
+  const [searchTerms, setSearchTerms] = useState([]);
+  const [inputValue, setInputValue] = useState('');
+  const navigate = useNavigate();
 
   const searchPost = () => {
-    if (search.trim() || tags) {
-      dispatch(getPostsBySearch({ search, tags: tags.join(',') }));
-      history.push(`/posts/search?searchQuery=${search || 'none'}&tags=${tags.join(',')}`);
+    // Combine chips and current input value
+    const allTerms = [...searchTerms];
+    if (inputValue.trim()) {
+      allTerms.push(inputValue.trim());
+    }
+
+    if (allTerms.length > 0) {
+      const tags = allTerms
+        .filter((term) => term.startsWith('#'))
+        .map((tag) => tag.slice(1));
+      const memories = allTerms
+        .filter((term) => !term.startsWith('#'))
+        .join(' ');
+
+      const searchQuery = memories.trim();
+      const tagsQuery = tags.length > 0 ? tags.join(',') : '';
+
+      // Only proceed if we have either memories or tags
+      if (searchQuery || tagsQuery) {
+        dispatch(
+          getPostsBySearch({ search: searchQuery || 'none', tags: tagsQuery })
+        );
+      }
     } else {
-      history.push('/');
+      dispatch(getPosts(1));
     }
   };
-
-  const handleKeyPress = (e) => {
-    if (e.keyCode === 13) {
-      searchPost();
-    }
-  };
-
-  const handleAddChip = (tag) => setTags([...tags, tag]);
-
-  const handleDeleteChip = (chipToDelete) => setTags(tags.filter((tag) => tag !== chipToDelete));
 
   return (
     <Grow in>
-      <Container maxWidth="xl">
-        <Grid container justify="space-between" alignItems="stretch" spacing={3} className={classes.gridContainer}>
-          <Grid item xs={12} sm={6} md={9}>
+      <Container maxWidth='xl'>
+        <Grid container spacing={3} className={classes.gridContainer}>
+          {/* Search Bar Section - Top */}
+          <Grid item xs={12}>
+            <AppBar
+              className={classes.appBarSearch}
+              position='static'
+              color='inherit'
+            >
+              <Autocomplete
+                multiple
+                freeSolo
+                fullWidth
+                options={[]}
+                value={searchTerms}
+                inputValue={inputValue}
+                onInputChange={(event, newInputValue) => {
+                  setInputValue(newInputValue);
+                }}
+                onChange={(event, newValue) => {
+                  setSearchTerms(newValue);
+                  setInputValue('');
+                  // If all chips are removed, clear search and show all posts
+                  if (newValue.length === 0) {
+                    dispatch(getPosts(1));
+                  }
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const isTag = option.startsWith('#');
+                    return (
+                      <Chip
+                        key={index}
+                        variant='filled'
+                        label={option}
+                        {...getTagProps({ index })}
+                        className={isTag ? classes.tagChip : classes.memoryChip}
+                      />
+                    );
+                  })
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    variant='outlined'
+                    label='Search Memories & Tags'
+                    placeholder='Type memories or #tags'
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {params.InputProps.endAdornment}
+                          <InputAdornment position='end'>
+                            <IconButton
+                              onClick={searchPost}
+                              edge='end'
+                              color='primary'
+                              className={classes.searchIcon}
+                            >
+                              <SearchIcon />
+                            </IconButton>
+                          </InputAdornment>
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+              />
+            </AppBar>
+          </Grid>
+
+          {/* Posts Section - Full Width */}
+          <Grid item xs={12}>
             <Posts setCurrentId={setCurrentId} />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <AppBar className={classes.appBarSearch} position="static" color="inherit">
-              <TextField onKeyDown={handleKeyPress} name="search" variant="outlined" label="Search Memories" fullWidth value={search} onChange={(e) => setSearch(e.target.value)} />
-              <ChipInput
-                style={{ margin: '10px 0' }}
-                value={tags}
-                onAdd={(chip) => handleAddChip(chip)}
-                onDelete={(chip) => handleDeleteChip(chip)}
-                label="Search Tags"
-                variant="outlined"
-              />
-              <Button onClick={searchPost} className={classes.searchButton} variant="contained" color="primary">Search</Button>
-            </AppBar>
-            <Form currentId={currentId} setCurrentId={setCurrentId} />
-            {(!searchQuery && !tags.length) && (
+
+          {/* Pagination Section - Bottom Center */}
+          {!searchQuery && !searchTerms.length && (
+            <Grid item xs={12}>
               <Paper className={classes.pagination} elevation={6}>
                 <Pagination page={page} />
               </Paper>
-            )}
-          </Grid>
+            </Grid>
+          )}
         </Grid>
       </Container>
     </Grow>

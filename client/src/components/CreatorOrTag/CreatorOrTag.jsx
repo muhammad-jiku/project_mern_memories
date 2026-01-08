@@ -1,42 +1,84 @@
-import React, { useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
-import { Typography, CircularProgress, Grid, Divider } from '@material-ui/core';
+import {
+  Container,
+  Divider,
+  Grid,
+  Grow,
+  Paper,
+  Typography,
+} from '@mui/material';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useLocation, useParams } from 'react-router-dom';
 
-import Post from '../Posts/Post/Post';
 import { getPostsByCreator, getPostsBySearch } from '../../actions/posts';
+import Posts from '../Posts/Posts';
+import useStyles from './styles';
 
 const CreatorOrTag = () => {
   const { name } = useParams();
   const dispatch = useDispatch();
   const { posts, isLoading } = useSelector((state) => state.posts);
-
+  const classes = useStyles();
   const location = useLocation();
 
-  useEffect(() => {
-    if (location.pathname.startsWith('/tags')) {
-      dispatch(getPostsBySearch({ tags: name }));
-    } else {
-      dispatch(getPostsByCreator(name));
-    }
-  }, []);
+  const isCreatorPage = location.pathname.includes('/creators/');
+  const isTagPage = location.pathname.includes('/tags/');
 
-  if (!posts.length && !isLoading) return 'No posts';
+  useEffect(() => {
+    if (isCreatorPage) {
+      dispatch(getPostsByCreator(name));
+    } else if (isTagPage) {
+      dispatch(getPostsBySearch({ search: 'none', tags: name }));
+    }
+  }, [dispatch, name, isCreatorPage, isTagPage]);
+
+  if (!posts?.length && !isLoading) {
+    return (
+      <Grow in>
+        <Container maxWidth='xl'>
+          <Paper className={classes.paper} elevation={6}>
+            <Typography variant='h4' className={classes.title}>
+              No posts found
+            </Typography>
+            <Typography variant='body1' className={classes.subtitle}>
+              {isCreatorPage
+                ? `No posts by ${name} yet`
+                : `No posts with tag #${name} yet`}
+            </Typography>
+          </Paper>
+        </Container>
+      </Grow>
+    );
+  }
 
   return (
-    <div>
-      <Typography variant="h2">{name}</Typography>
-      <Divider style={{ margin: '20px 0 50px 0' }} />
-      {isLoading ? <CircularProgress /> : (
-        <Grid container alignItems="stretch" spacing={3}>
-          {posts?.map((post) => (
-            <Grid key={post._id} item xs={12} sm={12} md={6} lg={3}>
-              <Post post={post} />
-            </Grid>
-          ))}
+    <Grow in>
+      <Container maxWidth='xl'>
+        <Grid container spacing={3} className={classes.container}>
+          {/* Header Section */}
+          <Grid item xs={12}>
+            <Paper className={classes.header} elevation={6}>
+              <Typography variant='h4' className={classes.title}>
+                {isCreatorPage ? `Posts by ${name}` : `Posts tagged #${name}`}
+              </Typography>
+              <Divider className={classes.divider} />
+              <Typography variant='body1' className={classes.subtitle}>
+                {isLoading
+                  ? 'Loading posts...'
+                  : `${posts?.length || 0} ${
+                      posts?.length === 1 ? 'post' : 'posts'
+                    } found`}
+              </Typography>
+            </Paper>
+          </Grid>
+
+          {/* Posts Section */}
+          <Grid item xs={12}>
+            <Posts />
+          </Grid>
         </Grid>
-      )}
-    </div>
+      </Container>
+    </Grow>
   );
 };
 
